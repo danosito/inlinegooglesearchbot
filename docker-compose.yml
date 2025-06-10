@@ -8,6 +8,8 @@ services:
     env_file: .env
     depends_on:
       - redis
+    volumes:
+      - bot-db:/app/db
 
   redis:
     image: redis:7-alpine
@@ -17,4 +19,5 @@ services:
       - redis-data:/data
 
 volumes:
+  bot-db:
   redis-data:

@@ -49,7 +49,10 @@ class SettingsStates(StatesGroup):
     waiting_lim: State = State()
 
 # ─── БД (SQLite) ───────────────────────────────────────────────────────────────
-DB_PATH = "tokens_and_settings.db"
+DB_DIR = os.getenv("DB_DIR", "/app/db")
+os.makedirs(DB_DIR, exist_ok=True)
+
+DB_PATH = os.path.join(DB_DIR, "tokens_and_settings.db")
 
 
 @asynccontextmanager
