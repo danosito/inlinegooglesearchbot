@@ -55,11 +55,9 @@ jobs:
             git pull --ff-only
 
             # 2. Создаём/обновляем .env
-            cat > .env <<EOF
-BOT_TOKEN=${{ secrets.BOT_TOKEN }}
-GOOGLE_CX=${{ secrets.GOOGLE_CX }}
-REDIS_URL=redis://redis-gsb:6379/0
-EOF
+            echo "BOT_TOKEN=${{ secrets.BOT_TOKEN }}" > .env
+            echo "GOOGLE_CX=${{ secrets.GOOGLE_CX }}" >> .env
+            echo "REDIS_URL=redis://redis-gsb:6379/0" >> .env
 
             # 3. Собираем и перезапускаем контейнеры
             docker compose pull          # вдруг образ redis обновился
