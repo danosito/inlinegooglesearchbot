@@ -241,13 +241,13 @@ async def cmd_settings(msg: Message):
 
 
 @router.callback_query(F.data == "set_gl:ask")
-async def cb_ask_gl(cb: CallbackQuery):
+async def cb_ask_gl(cb: CallbackQuery, state: FSMContext):
     await cb.answer()
     await cb.message.reply(
         "Введите двухбуквенный ISO-код страны для геолокации (например, DE, US, RU)."
     )
     await cb.message.delete_reply_markup()  # прячем старую клаву
-    await cb.bot.set_state(cb.from_user.id, SettingsStates.waiting_gl)
+    await state.set_state(SettingsStates.waiting_gl)
 
 
 @router.message(SettingsStates.waiting_gl)
