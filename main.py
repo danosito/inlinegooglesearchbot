@@ -47,6 +47,7 @@ class TokenStates(StatesGroup):
 # ─── Доп. состояния FSM ───────────────────────────────────────────
 class SettingsStates(StatesGroup):
     waiting_lim: State = State()
+    waiting_gl: State = State()
 
 # ─── БД (SQLite) ───────────────────────────────────────────────────────────────
 DB_DIR = os.getenv("DB_DIR", "/app/db")
