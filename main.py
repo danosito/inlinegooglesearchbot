@@ -44,6 +44,9 @@ logging.basicConfig(
 class TokenStates(StatesGroup):
     waiting_key: State = State()
 
+# ─── Доп. состояния FSM ───────────────────────────────────────────
+class SettingsStates(StatesGroup):
+    waiting_lim: State = State()
 
 # ─── БД (SQLite) ───────────────────────────────────────────────────────────────
 DB_PATH = "tokens_and_settings.db"
@@ -181,19 +184,18 @@ async def cmd_start(msg: Message):
 @router.message(Command("help"))
 async def cmd_help(msg: Message):
     await msg.answer(
-        "*Как пользоваться*\n"
-        "1. Введите `@inlinegooglesearchbot запрос` и выберите результат.\n"
-        "2. *По желанию* подключите свой Google API-ключ — /token.\n\n"
-        "• Документация — [Google Custom Search](https://developers.google.com/custom-search/v1/introduction)\n"
-        "• Исходники — [GitHub](https://github.com/danosito/inlinegooglesearchbot)\n"
-        f"• Автор — {ADMIN_CONTACT}",
+        "📖 Полная документация — "
+        "[README.md](https://github.com/danosito/inlinegooglesearchbot#readme)\n\n"
+        "Бот работает *только* с личным Google API-ключом.\n"
+        "Получите ключ командой /token и далее следуйте инструкции.",
         parse_mode=ParseMode.MARKDOWN,
         disable_web_page_preview=True,
     )
 
 
+
 # ——— /settings
-def settings_keyboard(show_logo: bool, limit: int) -> InlineKeyboardMarkup:
+def settings_keyboard(show_logo: bool, lim: int) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
         [
             InlineKeyboardButton(
@@ -202,11 +204,13 @@ def settings_keyboard(show_logo: bool, limit: int) -> InlineKeyboardMarkup:
             )
         ],
         [
-            InlineKeyboardButton(text="Результатов 3", callback_data="set_lim:3"),
-            InlineKeyboardButton(text="Результатов 5", callback_data="set_lim:5"),
-            InlineKeyboardButton(text="Результатов 10", callback_data="set_lim:10"),
+            InlineKeyboardButton(
+                text=f"⚙️ Кол-во результатов (сейчас — {lim})",
+                callback_data="set_lim:ask",
+            )
         ],
     ])
+
 
 
 @router.message(Command("settings"))
@@ -228,13 +232,28 @@ async def cb_set_logo(cb: CallbackQuery):
     await cb.answer("Обновлено!")
 
 
-@router.callback_query(F.data.startswith("set_lim"))
-async def cb_set_lim(cb: CallbackQuery):
-    new_lim = int(cb.data.split(":")[1])
-    await update_settings(cb.from_user.id, limit=new_lim)
-    st = await fetch_settings(cb.from_user.id)
-    await cb.message.edit_reply_markup(settings_keyboard(st["show_logo"], st["limit"]))
-    await cb.answer("Обновлено!")
+@router.callback_query(F.data == "set_lim:ask")
+async def cb_ask_lim(cb: CallbackQuery, state: FSMContext):
+    await cb.answer()
+    await cb.message.reply(
+        "Введите число от 1 до 10 — сколько результатов показывать."
+    )
+    await state.set_state(SettingsStates.waiting_lim)
+
+
+@router.message(SettingsStates.waiting_lim)
+async def set_lim_value(msg: Message, state: FSMContext):
+    if not msg.text.isdigit():
+        await msg.reply("Нужно число.")
+        return
+    value = int(msg.text)
+    if not 1 <= value <= 10:
+        await msg.reply("Число должно быть от 1 до 10.")
+        return
+    await update_settings(msg.from_user.id, limit=value)
+    await msg.reply(f"✅ Сохранено: {value}")
+    await state.clear()
+
 
 
 # ——— /token
@@ -244,15 +263,23 @@ TOKEN_REGEX = re.compile(r"^AIza[0-9A-Za-z_\-]{35}$")
 @router.message(Command("token"))
 async def cmd_token(msg: Message, state: FSMContext):
     await msg.answer(
-        "ℹ️ *Добавление Google API-ключа*\n\n"
-        "1. Создайте ключ в [Google Cloud Console]"
-        "(https://console.cloud.google.com/apis/credentials) (тип *API key*).\n"
-        "2. Убедитесь, что включено API *Custom Search JSON API*.\n"
-        "3. Пришлите *только* ключ одним сообщением.",
+        "🔑 *Как получить Google API-ключ*\n"
+        "1. Перейдите в [Google Cloud Console]"
+        "(https://console.cloud.google.com/).\n"
+        "2. Создайте новый проект (или выберите существующий).\n"
+        "3. В левом меню: *APIs & Services → Library*.\n"
+        "4. Найдите и включите **Custom Search API** "
+        "(или перейдите по прямой ссылке "
+        "[сюда](https://console.cloud.google.com/apis/api/customsearch.googleapis.com)).\n"
+        "5. После включения вернитесь в *APIs & Services → Credentials*.\n"
+        "6. Нажмите *Create credentials → API key*.\n"
+        "7. Скопируйте ключ и отправьте мне *одним сообщением*.\n\n"
+        "_Ключ обязателен для работы бота._",
         parse_mode=ParseMode.MARKDOWN,
         disable_web_page_preview=True,
     )
     await state.set_state(TokenStates.waiting_key)
+
 
 
 @router.message(TokenStates.waiting_key)
