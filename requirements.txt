@@ -2,3 +2,4 @@ aiogram==3.*
 python-dotenv>=1.0
 aiohttp>=3.9
 aiosqlite>=0.19
+redis>=5.0  # redis-py с поддержкой asyncio

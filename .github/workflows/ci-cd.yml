@@ -1,0 +1,66 @@
+name: Lint & Deploy
+
+on:
+  push:
+    branches: [ main ]          # или другая рабочая ветка
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install ruff        # быстрый линтер
+          pip install -r requirements.txt
+
+      - name: Ruff lint
+        run: ruff .
+
+  deploy:
+    needs: lint
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      # ▸ SSH key хранится в секрете SSH_KEY (формат OpenSSH-private-key)
+      # ▸ host/user/port тоже через Secrets
+      - name: Deploy to VPS via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          port: ${{ secrets.SSH_PORT || '22' }}
+          key: ${{ secrets.SSH_KEY }}
+          # Среда выполнения — bash-команды на сервере
+          script: |
+            set -e
+
+            # 1. Клонируем или обновляем код
+            if [ ! -d ~/inlinegooglesearchbot ]; then
+              git clone --depth=1 https://github.com/<YOUR_GH_USERNAME>/inlinegooglesearchbot.git ~/inlinegooglesearchbot
+            fi
+            cd ~/inlinegooglesearchbot
+            git pull --ff-only
+
+            # 2. Создаём/обновляем .env
+            cat > .env <<EOF
+BOT_TOKEN=${{ secrets.BOT_TOKEN }}
+GOOGLE_CX=${{ secrets.GOOGLE_CX }}
+REDIS_URL=redis://redis-gsb:6379/0
+EOF
+
+            # 3. Собираем и перезапускаем контейнеры
+            docker compose pull          # вдруг образ redis обновился
+            docker compose up -d --build

@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="DataSourceManagerImpl" format="xml" multifile-model="true">
-    <data-source source="LOCAL" name="tokens" uuid="eea0d3c1-e099-4569-8ada-d810d9fd51a0">
+    <data-source source="LOCAL" name="tokens_and_settings" uuid="95a119c2-f89e-4337-89e7-3254cad64163">
       <driver-ref>sqlite.xerial</driver-ref>
       <synchronize>true</synchronize>
       <jdbc-driver>org.sqlite.JDBC</jdbc-driver>
-      <jdbc-url>jdbc:sqlite:C:\Users\dan\PycharmProjects\inlinegooglesearchbot\tokens.db</jdbc-url>
+      <jdbc-url>jdbc:sqlite:C:\Users\dan\PycharmProjects\inlinegooglesearchbot\tokens_and_settings.db</jdbc-url>
       <working-dir>$ProjectFileDir$</working-dir>
       <libraries>
         <library>
