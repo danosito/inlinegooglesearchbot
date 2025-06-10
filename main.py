@@ -103,8 +103,8 @@ async def fetch_settings(user_id: int) -> Dict[str, Any]:
         ) as cur:
             row = await cur.fetchone()
             if row:
-                return {"show_logo": bool(row[0]), "lim": row[1], "gl": row[2] or ""}
-    return {"show_logo": True, "lim": 5, "gl": ""}
+                return {"show_logo": bool(row[0]), "limit": row[1], "gl": row[2] or ""}
+    return {"show_logo": True, "limit": 5, "gl": ""}
 
 
 async def update_settings(user_id: int,
