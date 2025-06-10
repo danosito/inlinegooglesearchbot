@@ -148,7 +148,9 @@ GOOGLE_ENDPOINT = "https://www.googleapis.com/customsearch/v1"
 async def google_search(api_key: str, query: str, *, limit: int, session: aiohttp.ClientSession, gl: str = None):
     params = {"key": api_key, "cx": GOOGLE_CX, "q": query, "num": limit}
     if gl:
+        gl = gl.lower()
         params["gl"] = gl
+        params["hl"] = gl
     async with session.get(GOOGLE_ENDPOINT, params=params, timeout=10) as resp:
         if resp.status != 200:
             raise RuntimeError(f"Google API error {resp.status}: {await resp.text()}")
