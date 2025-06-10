@@ -39,6 +39,7 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
 )
 
+
 # ─── FSM для приёма токена ─────────────────────────────────────────────────────
 class TokenStates(StatesGroup):
     waiting_key: State = State()
@@ -81,7 +82,7 @@ async def save_token(user_id: int, key: str):
 async def fetch_token(user_id: int) -> Optional[str]:
     async with with_db() as db:
         async with db.execute(
-            "SELECT key FROM tokens WHERE user_id = ?", (user_id,)
+                "SELECT key FROM tokens WHERE user_id = ?", (user_id,)
         ) as cur:
             row = await cur.fetchone()
             return row[0] if row else None
@@ -90,7 +91,7 @@ async def fetch_token(user_id: int) -> Optional[str]:
 async def fetch_settings(user_id: int) -> Dict[str, Any]:
     async with with_db() as db:
         async with db.execute(
-            "SELECT show_logo, lim FROM settings WHERE user_id = ?", (user_id,)
+                "SELECT show_logo, lim FROM settings WHERE user_id = ?", (user_id,)
         ) as cur:
             row = await cur.fetchone()
             if row:
@@ -161,6 +162,7 @@ async def google_search(api_key: str, query: str, *, limit: int, session: aiohtt
 
 # ─── Telegram роутеры ──────────────────────────────────────────────────────────
 router = Dispatcher()
+
 
 # ——— /start
 @router.message(CommandStart())
