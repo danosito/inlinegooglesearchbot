@@ -67,8 +67,9 @@ async def with_db():
             );
             CREATE TABLE IF NOT EXISTS settings (
                 user_id INTEGER PRIMARY KEY,
-                show_logo INTEGER DEFAULT 1,     -- 1 = True
-                lim INTEGER DEFAULT 5
+                show_logo INTEGER DEFAULT 1, 
+                lim INTEGER DEFAULT 5,
+                gl TEXT DEFAULT ''  
             );
             """
         )
@@ -97,28 +98,33 @@ async def fetch_token(user_id: int) -> Optional[str]:
 async def fetch_settings(user_id: int) -> Dict[str, Any]:
     async with with_db() as db:
         async with db.execute(
-                "SELECT show_logo, lim FROM settings WHERE user_id = ?", (user_id,)
+            "SELECT show_logo, lim, gl FROM settings WHERE user_id = ?", (user_id,)
         ) as cur:
             row = await cur.fetchone()
             if row:
-                return {"show_logo": bool(row[0]), "limit": row[1]}
-        # defaults
-        return {"show_logo": True, "limit": 5}
+                return {"show_logo": bool(row[0]), "lim": row[1], "gl": row[2] or ""}
+    return {"show_logo": True, "lim": 5, "gl": ""}
 
 
-async def update_settings(user_id: int, *, show_logo: Optional[bool] = None, limit: Optional[int] = None):
+async def update_settings(user_id: int,
+                          *,
+                          show_logo: Optional[bool] = None,
+                          lim: Optional[int] = None,
+                          gl: Optional[str] = None):
     async with with_db() as db:
-        current = await fetch_settings(user_id)
-        show_logo_val = int(show_logo) if show_logo is not None else int(current["show_logo"])
-        limit_val = limit if limit is not None else current["limit"]
+        cur = await fetch_settings(user_id)
+        show_logo_v = int(show_logo) if show_logo is not None else int(cur["show_logo"])
+        lim_v = lim if lim is not None else cur["lim"]
+        gl_v = gl if gl is not None else cur["gl"]
         await db.execute(
             """
-            INSERT OR REPLACE INTO settings (user_id, show_logo, lim)
-            VALUES (?, ?, ?)
+            INSERT OR REPLACE INTO settings (user_id, show_logo, lim, gl)
+            VALUES (?, ?, ?, ?)
             """,
-            (user_id, show_logo_val, limit_val),
+            (user_id, show_logo_v, lim_v, gl_v),
         )
         await db.commit()
+
 
 
 # ─── Redis кэш ─────────────────────────────────────────────────────────────────
@@ -138,8 +144,10 @@ async def cache_set(q: str, items: List[Dict[str, str]]):
 GOOGLE_ENDPOINT = "https://www.googleapis.com/customsearch/v1"
 
 
-async def google_search(api_key: str, query: str, *, limit: int, session: aiohttp.ClientSession):
+async def google_search(api_key: str, query: str, *, limit: int, session: aiohttp.ClientSession, gl: str = None):
     params = {"key": api_key, "cx": GOOGLE_CX, "q": query, "num": limit}
+    if gl:
+        params["gl"] = gl
     async with session.get(GOOGLE_ENDPOINT, params=params, timeout=10) as resp:
         if resp.status != 200:
             raise RuntimeError(f"Google API error {resp.status}: {await resp.text()}")
@@ -198,21 +206,26 @@ async def cmd_help(msg: Message):
 
 
 # ——— /settings
-def settings_keyboard(show_logo: bool, lim: int) -> InlineKeyboardMarkup:
+def settings_keyboard(show_logo: bool, lim: int, gl: str) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
         [
             InlineKeyboardButton(
-                text=f"Логотипы: {'✅ On' if show_logo else '❌ Off'}",
+                text=f"Лого: {'✅' if show_logo else '❌'}",
                 callback_data=f"set_logo:{int(not show_logo)}",
             )
         ],
         [
             InlineKeyboardButton(
-                text=f"⚙️ Кол-во результатов (сейчас — {lim})",
+                text=f"Результатов: {lim}",
                 callback_data="set_lim:ask",
-            )
+            ),
+            InlineKeyboardButton(
+                text=f"Страна (GL): {gl or '—'}",
+                callback_data="set_gl:ask",
+            ),
         ],
     ])
+
 
 
 
@@ -221,9 +234,32 @@ async def cmd_settings(msg: Message):
     st = await fetch_settings(msg.from_user.id)
     await msg.answer(
         "*Ваши настройки*",
-        reply_markup=settings_keyboard(st["show_logo"], st["limit"]),
+        reply_markup=settings_keyboard(st["show_logo"], st["lim"], st["gl"]),
         parse_mode=ParseMode.MARKDOWN,
     )
+
+
+@router.callback_query(F.data == "set_gl:ask")
+async def cb_ask_gl(cb: CallbackQuery):
+    await cb.answer()
+    await cb.message.reply(
+        "Введите двухбуквенный ISO-код страны для геолокации (например, DE, US, RU)."
+    )
+    await cb.message.delete_reply_markup()  # прячем старую клаву
+    await cb.bot.set_state(cb.from_user.id, SettingsStates.waiting_gl)
+
+
+@router.message(SettingsStates.waiting_gl)
+async def set_gl_value(msg: Message, state: FSMContext):
+    code = msg.text.strip().upper()
+    if not re.fullmatch(r"[A-Z]{2}", code):
+        await msg.reply("Нужно ровно 2 буквы (например, DE). Попробуйте ещё раз.")
+        return
+
+    await update_settings(msg.from_user.id, gl=code)
+    await msg.reply(f"✅ GL установлен на «{code}»")
+    await state.clear()
+
 
 
 @router.callback_query(F.data.startswith("set_logo"))
@@ -324,6 +360,7 @@ async def inline_google(query: InlineQuery, bot: Bot):
     settings = await fetch_settings(user_id)
     limit = settings["limit"]
     show_logo = settings["show_logo"]
+    gl = settings["gl"]
 
     # пробуем кэш
     cached = await cache_get(q)
@@ -353,7 +390,7 @@ async def inline_google(query: InlineQuery, bot: Bot):
         # нет кэша — делаем запрос к Google
         try:
             async with aiohttp.ClientSession() as session:
-                items = await google_search(token, q, limit=limit, session=session)
+                items = await google_search(token, q, limit=limit, session=session, gl=gl)
             # кэшируем FULL набор (5, 10). TTL = 24 ч
             await cache_set(q, items)
         except Exception as e:
