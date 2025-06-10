@@ -110,19 +110,19 @@ async def fetch_settings(user_id: int) -> Dict[str, Any]:
 async def update_settings(user_id: int,
                           *,
                           show_logo: Optional[bool] = None,
-                          lim: Optional[int] = None,
+                          limit: Optional[int] = None,
                           gl: Optional[str] = None):
     async with with_db() as db:
         cur = await fetch_settings(user_id)
         show_logo_v = int(show_logo) if show_logo is not None else int(cur["show_logo"])
-        lim_v = lim if lim is not None else cur["limit"]
+        limit_v = limit if limit is not None else cur["limit"]
         gl_v = gl if gl is not None else cur["gl"]
         await db.execute(
             """
             INSERT OR REPLACE INTO settings (user_id, show_logo, lim, gl)
             VALUES (?, ?, ?, ?)
             """,
-            (user_id, show_logo_v, lim_v, gl_v),
+            (user_id, show_logo_v, limit_v, gl_v),
         )
         await db.commit()
 
