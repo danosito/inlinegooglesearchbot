@@ -115,7 +115,7 @@ async def update_settings(user_id: int,
     async with with_db() as db:
         cur = await fetch_settings(user_id)
         show_logo_v = int(show_logo) if show_logo is not None else int(cur["show_logo"])
-        lim_v = lim if lim is not None else cur["lim"]
+        lim_v = lim if lim is not None else cur["limit"]
         gl_v = gl if gl is not None else cur["gl"]
         await db.execute(
             """
@@ -235,7 +235,7 @@ async def cmd_settings(msg: Message):
     st = await fetch_settings(msg.from_user.id)
     await msg.answer(
         "*Ваши настройки*",
-        reply_markup=settings_keyboard(st["show_logo"], st["lim"], st["gl"]),
+        reply_markup=settings_keyboard(st["show_logo"], st["limit"], st["gl"]),
         parse_mode=ParseMode.MARKDOWN,
     )
 
